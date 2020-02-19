@@ -4,5 +4,4 @@ This CloudFormation template creates the network structure to an extension of On
 
 The image below shows the structure.
 
-![Diagram]
-(/images/diagram.png)
+![Diagram](/images/diagram.png)
