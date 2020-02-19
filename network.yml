@@ -1,0 +1,145 @@
+Description: >
+    Marcos de Jesus
+    This template deploys a VPC structure to connect with an on-premises network.
+    I used two subnets just for the sake of high availability
+
+Parameters:
+
+    EnvironmentName:
+        Description: An enviroment name that will be prefixed to resources names
+        Type: String
+
+    VpcCIDR:
+        Description: Please enter the IP range (CIDR notation) for this VPC
+        Type: String
+        Default: 10.0.0.0/16
+
+    Subnet1CIDR:
+        Description: Please enter the IP range (CIDR notation) for this Subnet
+        Type: String
+        Default: 10.0.0.0/24
+
+    Subnet2CIDR:
+        Description: Please enter the IP range (CIDR notation) for this Subnet 
+        Type: String
+        Default: 10.0.1.0/24
+
+    OnPremisesCidr:
+        Description: Please enter the IP range (CIDR notation) for the address of the On Premises network
+        Type: String
+        Default: 0.0.0.0/0
+
+Resources:
+
+    VPC:
+        Type: AWS::EC2::VPC
+        Properties:
+            CidrBlock: !Ref VpcCIDR
+            Tags:
+                - Key: Name
+                  Value:
+                      Ref: EnvironmentName
+
+    VPNGateway:
+        Type: AWS::EC2::VPNGateway
+        Properties:
+            Type: ipsec.1
+            Tags:
+                - Key: Name
+                  Value:
+                      Ref: EnvironmentName
+
+    VPNGatewayAttachment:
+        Type: AWS::EC2::VPCGatewayAttachment
+        Properties:
+            VpcId:
+                Ref: VPC
+            VpnGatewayId:
+                Ref: VPNGateway
+
+    SubnetA:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId:
+                Ref: VPC
+            AvailabilityZone:
+                Fn::Select: [0, !GetAZs '']
+            CidrBlock:
+                Ref: Subnet1CIDR 
+            Tags:
+                - Key: Name
+                  Value: !Sub '${EnvironmentName} Subnet (AZ1)'
+
+    SubnetB:
+        Type: AWS::EC2::Subnet
+        Properties:
+            VpcId:
+                Ref: VPC
+            AvailabilityZone:
+                Fn::Select: [1, !GetAZs '']
+            CidrBlock:
+                Ref: Subnet2CIDR 
+            Tags:
+                - Key: Name
+                  Value: !Sub '${EnvironmentName} Subnet (AZ2)'
+
+    DefaultRouteTable:
+        Type: AWS::EC2::RouteTable
+        Properties:
+            VpcId:
+                Ref: VPC
+            Tags:
+                - Key: Name
+                  Value: !Sub ${EnvironmentName} Default Routes
+
+    OnPremisesRoute:
+        Type: AWS::EC2::Route
+        DependsOn: VPNGatewayAttachment
+        Properties:
+            DestinationCidrBlock: !Ref OnPremisesCidr
+            GatewayId: !Ref VPNGateway
+            RouteTableId: !Ref DefaultRouteTable
+
+    SubnetARouteTableAssociation:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            RouteTableId: !Ref DefaultRouteTable
+            SubnetId: !Ref SubnetA
+
+    SubnetBRouteTableAssociation:
+        Type: AWS::EC2::SubnetRouteTableAssociation
+        Properties:
+            RouteTableId: !Ref DefaultRouteTable
+            SubnetId: !Ref SubnetB
+
+Outputs: 
+
+    VPC: 
+        Description: A reference to the created VPC
+        Value: !Ref VPC
+        Export:
+          Name: !Sub ${EnvironmentName}-VPCID
+
+    VPCRouteTable:
+        Description: Default Route Table
+        Value: !Ref DefaultRouteTable
+        Export:
+          Name: !Sub ${EnvironmentName}-DEF-RT
+
+    Subnets:
+        Description: A list of the subnets
+        Value: !Join [ ",", [ !Ref SubnetA, !Ref SubnetB ]]
+        Export:
+          Name: !Sub ${EnvironmentName}-NETS
+
+    SubnetA:
+        Description: A reference to the subnet in the 1st Availability Zone
+        Value: !Ref SubnetA
+        Export:
+          Name: !Sub ${EnvironmentName}-1-SN
+
+    SubnetB: 
+        Description: A reference to the subnet in the 2nd Availability Zone
+        Value: !Ref SubnetB
+        Export:
+          Name: !Sub ${EnvironmentName}-2-SN
