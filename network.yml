@@ -29,6 +29,15 @@ Parameters:
         Type: String
         Default: 0.0.0.0/0
 
+    CGWIPAdres:
+        Description: Please enter the IP Adress of the Customer Gateway
+        Type: String
+
+    CGWBGPASN:
+        Description: Please enter the Customer Gateway's BGP ASN number
+        Type: Number
+        Default: 65000
+
 Resources:
 
     VPC:
@@ -39,6 +48,16 @@ Resources:
                 - Key: Name
                   Value:
                       Ref: EnvironmentName
+
+    CustomerGateway:
+        Type: AWS::EC2::CustomerGateway
+        Properties: 
+          BgpAsn: !Ref CGWBGPASN
+          IpAddress: !Ref CGWIPAdres
+          Tags: 
+            - Key: Name
+              Value: !Ref EnvironmentName
+          Type: ipsec.1
 
     VPNGateway:
         Type: AWS::EC2::VPNGateway
@@ -56,6 +75,16 @@ Resources:
                 Ref: VPC
             VpnGatewayId:
                 Ref: VPNGateway
+              
+    VPNConnection:
+        Type: AWS::EC2::VPNConnection
+        Properties: 
+          CustomerGatewayId: !Ref CustomerGateway
+          Tags: 
+            - Key: Name
+              Value: !Ref EnvironmentName
+          Type: ipsec.1
+          VpnGatewayId: !Ref VPNGateway
 
     SubnetA:
         Type: AWS::EC2::Subnet
